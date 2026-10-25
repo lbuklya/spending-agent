@@ -13,6 +13,7 @@ import logging
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -23,9 +24,11 @@ LOG_PATH = os.environ.get("SPENDING_LOG", os.path.join(os.path.dirname(__file__)
 # Free models on OpenRouter come and go; several comma-separated ids are tried in turn.
 MODELS = os.environ.get(
     "OPENROUTER_MODEL",
-    "google/gemma-4-31b-it:free,thinkingmachines/inkling:free,google/gemma-4-26b-a4b-it:free",
+    "google/gemma-4-31b-it:free,nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-26b-a4b-it:free,"
+    "xingchen-agi/xing4.0-29b-a4b:free",
 ).split(",")
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
+RETRY_AFTER_SECONDS = 3
 
 TABLE_HEADER = "| Дата | Сумма, ₽ | Категория | Что |"
 CATEGORIES = ["продукты", "Кир", "транспорт", "дом и быт", "связь", "праздники и подарки", "прочее",
@@ -94,12 +97,17 @@ def parse(phrase):
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if api_key:
         for model in MODELS:
-            try:
-                return parse_with_model(phrase, api_key, model), model
-            except urllib.error.HTTPError as exc:
-                log.warning("%s unavailable: %s", model, http_error_detail(exc))
-            except (urllib.error.URLError, KeyError, ValueError) as exc:
-                log.warning("%s unavailable: %s", model, exc)
+            for attempt in (1, 2):
+                try:
+                    return parse_with_model(phrase, api_key, model), model
+                except urllib.error.HTTPError as exc:
+                    log.warning("%s unavailable: %s", model, http_error_detail(exc))
+                    if exc.code != 429 or attempt == 2:
+                        break
+                    time.sleep(RETRY_AFTER_SECONDS)  # free pools are rate-limited in short bursts
+                except (urllib.error.URLError, KeyError, ValueError) as exc:
+                    log.warning("%s unavailable: %s", model, exc)
+                    break
         log.warning("no model answered - pick working ones at https://openrouter.ai/models?q=free; "
                     "using offline parser")
     return parse_offline(phrase), "без модели"

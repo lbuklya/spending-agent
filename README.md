@@ -30,7 +30,7 @@ python3 spending_agent.py "продукты 908"
 | Переменная | Что задаёт | По умолчанию |
 |------------|-----------|--------------|
 | `OPENROUTER_API_KEY` | ключ OpenRouter | нет - тогда разбор без модели |
-| `OPENROUTER_MODEL` | модель или несколько через запятую (запасные) | `google/gemma-4-31b-it:free,nvidia/nemotron-3-super-120b-a12b:free` |
+| `OPENROUTER_MODEL` | модель или несколько через запятую (запасные) | `nvidia/nemotron-3-super-120b-a12b:free,google/gemma-4-31b-it:free,thinkingmachines/inkling:free` |
 | `SPENDING_LOG` | путь к учёту трат | пример из `examples/` |
 | `SPENDING_WEEKLY_LIMIT` | недельный лимит, ₽ | 12000 |
 

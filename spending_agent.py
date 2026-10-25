@@ -22,7 +22,9 @@ WEEKLY_LIMIT = int(os.environ.get("SPENDING_WEEKLY_LIMIT", "12000"))
 LOG_PATH = os.environ.get("SPENDING_LOG", os.path.join(os.path.dirname(__file__), "examples", "spending-log.example.md"))
 # Free models on OpenRouter come and go; several ids in a row act as fallbacks (OpenRouter "models" routing).
 MODELS = os.environ.get(
-    "OPENROUTER_MODEL", "google/gemma-4-31b-it:free,nvidia/nemotron-3-super-120b-a12b:free").split(",")
+    "OPENROUTER_MODEL",
+    "nvidia/nemotron-3-super-120b-a12b:free,google/gemma-4-31b-it:free,thinkingmachines/inkling:free",
+).split(",")
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 TABLE_HEADER = "| Дата | Сумма, ₽ | Категория | Что |"
@@ -60,7 +62,8 @@ def parse_with_model(phrase, api_key):
     body = json.dumps({
         "model": MODELS[0],
         "models": MODELS,
-        "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": phrase}],
+        # Instructions go into the user message: some free providers (e.g. Gemma) reject a system role.
+        "messages": [{"role": "user", "content": f"{SYSTEM_PROMPT}\n\nФраза: {phrase}"}],
         "temperature": 0,
     }).encode()
     req = urllib.request.Request(API_URL, data=body, headers={
@@ -81,7 +84,9 @@ def parse(phrase):
             return parse_with_model(phrase, api_key), "модель"
         except urllib.error.HTTPError as exc:
             try:
-                detail = json.loads(exc.read().decode()).get("error", {}).get("message", "")
+                error = json.loads(exc.read().decode()).get("error", {})
+                raw = str(error.get("metadata", {}).get("raw", ""))[:200]
+                detail = " | ".join(x for x in (error.get("message", ""), raw) if x)
             except (ValueError, AttributeError):
                 detail = ""
             hint = " - check model ids at https://openrouter.ai/models?q=free" if exc.code == 404 else ""

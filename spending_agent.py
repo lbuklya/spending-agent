@@ -20,7 +20,9 @@ log = logging.getLogger("spending_agent")
 
 WEEKLY_LIMIT = int(os.environ.get("SPENDING_WEEKLY_LIMIT", "12000"))
 LOG_PATH = os.environ.get("SPENDING_LOG", os.path.join(os.path.dirname(__file__), "examples", "spending-log.example.md"))
-MODEL = os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
+# Free models on OpenRouter come and go; several ids in a row act as fallbacks (OpenRouter "models" routing).
+MODELS = os.environ.get(
+    "OPENROUTER_MODEL", "google/gemma-4-31b-it:free,nvidia/nemotron-3-super-120b-a12b:free").split(",")
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 TABLE_HEADER = "| Дата | Сумма, ₽ | Категория | Что |"
@@ -56,7 +58,8 @@ def parse_offline(phrase):
 
 def parse_with_model(phrase, api_key):
     body = json.dumps({
-        "model": MODEL,
+        "model": MODELS[0],
+        "models": MODELS,
         "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": phrase}],
         "temperature": 0,
     }).encode()
@@ -76,6 +79,9 @@ def parse(phrase):
     if api_key:
         try:
             return parse_with_model(phrase, api_key), "модель"
+        except urllib.error.HTTPError as exc:
+            hint = " - check model ids at https://openrouter.ai/models?q=free" if exc.code == 404 else ""
+            log.warning("model unavailable (%s)%s, falling back to offline parser", exc, hint)
         except (urllib.error.URLError, KeyError, ValueError) as exc:
             log.warning("model unavailable (%s), falling back to offline parser", exc)
     return parse_offline(phrase), "без модели"

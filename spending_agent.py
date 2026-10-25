@@ -150,7 +150,7 @@ def main(argv):
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     phrase = " ".join(argv[1:]).strip()
     if not phrase:
-        print('Как пользоваться: python3 spending_agent.py "продукты 908"')
+        print("Напишите трату одной фразой после команды, например: продукты 908  или  вчера такси 899")
         return 2
     entry, source = parse(phrase)
     if entry["amount"] == 0:

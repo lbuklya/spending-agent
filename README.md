@@ -31,10 +31,10 @@ python3 spending_agent.py "продукты 908"
 |------------|-----------|--------------|
 | `OPENROUTER_API_KEY` | ключ OpenRouter | нет - тогда разбор без модели |
 | `OPENROUTER_MODEL` | модель или несколько через запятую (запасные) | `google/gemma-4-31b-it:free,nvidia/nemotron-3-super-120b-a12b:free` |
-
-> Бесплатные модели в OpenRouter периодически меняются. Ошибка 404 значит, что модели больше нет: выберите новую на [openrouter.ai/models?q=free](https://openrouter.ai/models?q=free).
 | `SPENDING_LOG` | путь к учёту трат | пример из `examples/` |
 | `SPENDING_WEEKLY_LIMIT` | недельный лимит, ₽ | 12000 |
+
+> Бесплатные модели в OpenRouter периодически меняются. Ошибка 404 значит, что модели больше нет: выберите новую на [openrouter.ai/models?q=free](https://openrouter.ai/models?q=free).
 
 Тесты: `python3 -m unittest -v`
 

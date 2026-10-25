@@ -80,8 +80,12 @@ def parse(phrase):
         try:
             return parse_with_model(phrase, api_key), "модель"
         except urllib.error.HTTPError as exc:
+            try:
+                detail = json.loads(exc.read().decode()).get("error", {}).get("message", "")
+            except (ValueError, AttributeError):
+                detail = ""
             hint = " - check model ids at https://openrouter.ai/models?q=free" if exc.code == 404 else ""
-            log.warning("model unavailable (%s)%s, falling back to offline parser", exc, hint)
+            log.warning("model unavailable (%s: %s)%s, falling back to offline parser", exc, detail, hint)
         except (urllib.error.URLError, KeyError, ValueError) as exc:
             log.warning("model unavailable (%s), falling back to offline parser", exc)
     return parse_offline(phrase), "без модели"

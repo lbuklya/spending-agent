@@ -1,0 +1,10 @@
+# secrets
+.env
+*.env
+.secrets/
+
+# real spending logs stay outside this repo
+spending-log.md
+
+__pycache__/
+*.pyc

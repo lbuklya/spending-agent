@@ -20,10 +20,10 @@ log = logging.getLogger("spending_agent")
 
 WEEKLY_LIMIT = int(os.environ.get("SPENDING_WEEKLY_LIMIT", "12000"))
 LOG_PATH = os.environ.get("SPENDING_LOG", os.path.join(os.path.dirname(__file__), "examples", "spending-log.example.md"))
-# Free models on OpenRouter come and go; several ids in a row act as fallbacks (OpenRouter "models" routing).
+# Free models on OpenRouter come and go; several comma-separated ids are tried in turn.
 MODELS = os.environ.get(
     "OPENROUTER_MODEL",
-    "nvidia/nemotron-3-super-120b-a12b:free,google/gemma-4-31b-it:free,thinkingmachines/inkling:free",
+    "google/gemma-4-31b-it:free,thinkingmachines/inkling:free,google/gemma-4-26b-a4b-it:free",
 ).split(",")
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -31,6 +31,9 @@ TABLE_HEADER = "| Дата | Сумма, ₽ | Категория | Что |"
 CATEGORIES = ["продукты", "Кир", "транспорт", "дом и быт", "связь", "праздники и подарки", "прочее",
               "долги и рассрочки", "подписки", "стоматолог", "перевод"]
 # Categories that do not count against the weekly living limit (mandatory payments, debts, transfers).
+# Offline parser: words that point to a category when the category name itself is not in the phrase.
+KEYWORDS = {"такси": "транспорт", "проезд": "транспорт", "метро": "транспорт", "автобус": "транспорт",
+            "магнит": "продукты", "лавка": "продукты", "самокат": "продукты", "пятёрочка": "продукты"}
 OUT_OF_LIMIT = {"долги и рассрочки", "подписки", "стоматолог", "перевод"}
 OUT_OF_LIMIT_MARK = "вне лимита"
 
@@ -54,14 +57,14 @@ def parse_offline(phrase):
     days_ago = 1 if "вчера" in words else 0
     words = words.replace("вчера", " ").replace("сегодня", " ")
     description = " ".join(words.split()) or "без описания"
-    category = next((c for c in CATEGORIES if c.lower() in description), "прочее")
+    category = next((c for c in CATEGORIES if c.lower() in description), None) or next(
+        (cat for word, cat in KEYWORDS.items() if word in description), "прочее")
     return {"amount": amount, "category": category, "description": description, "days_ago": days_ago}
 
 
-def parse_with_model(phrase, api_key):
+def parse_with_model(phrase, api_key, model):
     body = json.dumps({
-        "model": MODELS[0],
-        "models": MODELS,
+        "model": model,
         # Instructions go into the user message: some free providers (e.g. Gemma) reject a system role.
         "messages": [{"role": "user", "content": f"{SYSTEM_PROMPT}\n\nФраза: {phrase}"}],
         "temperature": 0,
@@ -77,22 +80,28 @@ def parse_with_model(phrase, api_key):
             "description": str(data.get("description") or "без описания"), "days_ago": int(data.get("days_ago") or 0)}
 
 
+def http_error_detail(exc):
+    try:
+        error = json.loads(exc.read().decode()).get("error", {})
+    except (ValueError, AttributeError):
+        return str(exc)
+    raw = str(error.get("metadata", {}).get("raw", ""))[:200]
+    return " | ".join(x for x in (str(exc), error.get("message", ""), raw) if x)
+
+
 def parse(phrase):
+    """Try each model in turn; free endpoints go down often, so one failure must not hide the others."""
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if api_key:
-        try:
-            return parse_with_model(phrase, api_key), "модель"
-        except urllib.error.HTTPError as exc:
+        for model in MODELS:
             try:
-                error = json.loads(exc.read().decode()).get("error", {})
-                raw = str(error.get("metadata", {}).get("raw", ""))[:200]
-                detail = " | ".join(x for x in (error.get("message", ""), raw) if x)
-            except (ValueError, AttributeError):
-                detail = ""
-            hint = " - check model ids at https://openrouter.ai/models?q=free" if exc.code == 404 else ""
-            log.warning("model unavailable (%s: %s)%s, falling back to offline parser", exc, detail, hint)
-        except (urllib.error.URLError, KeyError, ValueError) as exc:
-            log.warning("model unavailable (%s), falling back to offline parser", exc)
+                return parse_with_model(phrase, api_key, model), model
+            except urllib.error.HTTPError as exc:
+                log.warning("%s unavailable: %s", model, http_error_detail(exc))
+            except (urllib.error.URLError, KeyError, ValueError) as exc:
+                log.warning("%s unavailable: %s", model, exc)
+        log.warning("no model answered - pick working ones at https://openrouter.ai/models?q=free; "
+                    "using offline parser")
     return parse_offline(phrase), "без модели"
 
 

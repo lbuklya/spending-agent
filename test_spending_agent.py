@@ -25,7 +25,7 @@ class ParseOfflineTest(unittest.TestCase):
 
     def test_yesterday_and_spaces_in_amount(self):
         entry = sa.parse_offline("такси 1 180 вчера")
-        self.assertEqual((entry["amount"], entry["days_ago"]), (1180, 1))
+        self.assertEqual((entry["amount"], entry["category"], entry["days_ago"]), (1180, "транспорт", 1))
 
     def test_no_amount_is_an_error(self):
         with self.assertRaises(ValueError):

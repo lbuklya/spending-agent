@@ -44,5 +44,21 @@ class LedgerTest(unittest.TestCase):
         self.assertEqual(sa.week_spent(text, SUNDAY), 297)
 
 
+
+class MainTest(unittest.TestCase):
+    def test_empty_phrase_writes_nothing(self):
+        import os, tempfile
+        with tempfile.NamedTemporaryFile("w+", suffix=".md", delete=False, encoding="utf-8") as f:
+            f.write(LOG)
+        old = sa.LOG_PATH
+        sa.LOG_PATH = f.name
+        try:
+            self.assertEqual(sa.main(["spending_agent.py", "  "]), 2)
+            self.assertEqual(open(f.name, encoding="utf-8").read(), LOG)
+        finally:
+            sa.LOG_PATH = old
+            os.unlink(f.name)
+
+
 if __name__ == "__main__":
     unittest.main()

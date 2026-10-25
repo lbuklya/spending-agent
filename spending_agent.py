@@ -148,11 +148,14 @@ def week_spent(text, today):
 
 def main(argv):
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    if len(argv) < 2:
+    phrase = " ".join(argv[1:]).strip()
+    if not phrase:
         print('Как пользоваться: python3 spending_agent.py "продукты 908"')
         return 2
-    phrase = " ".join(argv[1:])
     entry, source = parse(phrase)
+    if entry["amount"] == 0:
+        print(f"Не поняла сумму во фразе «{phrase}» - ничего не записала. Попробуйте так: «продукты 908».")
+        return 1
     today = dt.date.today()
     day = today - dt.timedelta(days=entry["days_ago"])
     with open(LOG_PATH, encoding="utf-8") as f:
